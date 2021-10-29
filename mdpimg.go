@@ -14,10 +14,6 @@ import (
 
 type MdprWrapper struct{}
 
-func MDP() *MdprWrapper {
-	return new(MdprWrapper)
-}
-
 func (m *MdprWrapper) webHeader() http.Header {
 	headers := make(http.Header)
 	headers.Add("User-Agent", "Mozilla/5.0 (Linux; Android 7.1.1; E6533 Build/32.4.A.1.54; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/79.0.3945.136 Mobile Safari/537.36")
@@ -93,7 +89,8 @@ func (m *MdprWrapper) getAPIURL(mdprURL string) (apiURL string) {
 	return
 }
 
-func (m *MdprWrapper) GetImgs(mdprURL string) (imgs []string) {
+func GetImgs(mdprURL string) (imgs []string) {
+	m := new(MdprWrapper)
 	apiURL := m.getAPIURL(mdprURL)
 	if apiURL != "" {
 		resBody := m.httpGet(apiURL, m.apiHeader())
