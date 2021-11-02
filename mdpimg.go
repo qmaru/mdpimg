@@ -16,17 +16,15 @@ type MdprWrapper struct{}
 
 func (m *MdprWrapper) webHeader() http.Header {
 	headers := make(http.Header)
-	headers.Add("User-Agent", "Mozilla/5.0 (Linux; Android 7.1.1; E6533 Build/32.4.A.1.54; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/79.0.3945.136 Mobile Safari/537.36")
+	headers.Add("User-Agent", "mdpr-user-agent: Mozilla/5.0 (Linux; Android 7.1.1; E6533 Build/32.4.A.1.54; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/94.0.4606.85 Mobile Safari/537.36")
 	headers.Add("X-Requested-With", "jp.mdpr.mdprviewer")
 	return headers
 }
 
 func (m *MdprWrapper) apiHeader() http.Header {
 	headers := make(http.Header)
-	headers.Add("model", "E653325 (7.1.1)")
-	headers.Add("mdpr-api", "3.0.0")
-	headers.Add("mdpr-app", "android:37")
-	headers.Add("User-Agent", "okhttp/4.2.2")
+	headers.Add("mdpr-user-agent", "sony; E653325; android; 7.1.1; 3.10.4838(66);")
+	headers.Add("User-Agent", "okhttp/4.9.1")
 	return headers
 }
 
