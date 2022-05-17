@@ -2,8 +2,8 @@ package mdpimg
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -28,23 +28,23 @@ func (m *MdprWrapper) apiHeader() http.Header {
 	return headers
 }
 
-func (m *MdprWrapper) httpGet(url string, header http.Header) []byte {
+func (m *MdprWrapper) fetch(url string, header http.Header) ([]byte, error) {
 	httpClient := http.Client{Timeout: 30 * time.Second}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		log.Panic(err)
+		return nil, err
 	}
 	req.Header = header
 	res, err := httpClient.Do(req)
 	if err != nil {
-		log.Panic(err)
+		return nil, err
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		log.Panic(err)
+		return nil, err
 	}
 	defer res.Body.Close()
-	return body
+	return body, nil
 }
 
 func (m *MdprWrapper) getArticleID(url string) (aid string) {
@@ -64,41 +64,74 @@ func (m *MdprWrapper) URLCheck(url string) (string, bool) {
 	return "", false
 }
 
-func (m *MdprWrapper) getAPIURL(mdprURL string) (apiURL string) {
+func (m *MdprWrapper) GetImgURL(mdprURL string) (string, error) {
 	aid := m.getArticleID(mdprURL)
 	apiPrefix := "https://app2-mdpr.freetls.fastly.net"
 	mobilePrefix := "https://app2-mdpr.freetls.fastly.net/articles/detail/"
 
 	mobileIndex := mobilePrefix + aid
-	resBody := m.httpGet(mobileIndex, m.webHeader())
-
-	doc, _ := htmlquery.Parse(strings.NewReader(string(resBody)))
-	nodes := htmlquery.Find(doc, `//div[@class="p-articleBody"]/a`)
-	if len(nodes) != 0 {
-		node := nodes[0]
-		var apiJSON map[string]interface{}
-		apiData := htmlquery.SelectAttr(node, "data-mdprapp-option")
-		apiJSONString, _ := url.QueryUnescape(apiData)
-		json.Unmarshal([]byte(apiJSONString), &apiJSON)
-		apiURL = apiPrefix + apiJSON["url"].(string)
-	} else {
-		apiURL = ""
+	resBody, err := m.fetch(mobileIndex, m.webHeader())
+	if err != nil {
+		return "", err
 	}
-	return
-}
 
-func GetImgs(mdprURL string) (imgs []string) {
-	m := new(MdprWrapper)
-	apiURL := m.getAPIURL(mdprURL)
-	if apiURL != "" {
-		resBody := m.httpGet(apiURL, m.apiHeader())
-		var apiJSON map[string]interface{}
-		json.Unmarshal(resBody, &apiJSON)
-		mImgList := apiJSON["list"].([]interface{})
-		for i := 0; i < len(mImgList); i++ {
-			mData := mImgList[i].(map[string]interface{})
-			imgs = append(imgs, mData["url"].(string))
+	doc, err := htmlquery.Parse(strings.NewReader(string(resBody)))
+	if err != nil {
+		return "", err
+	}
+	nodes := htmlquery.Find(doc, `//div[@class="p-articleBody"]/a`)
+	for _, node := range nodes {
+		var appJson map[string]interface{}
+		appData := htmlquery.SelectAttr(node, "data-mdprapp-option")
+		appStr, err := url.QueryUnescape(appData)
+		if err != nil {
+			return "", err
+		}
+		err = json.Unmarshal([]byte(appStr), &appJson)
+		if err != nil {
+			return "", err
+		}
+		mdpURL := appJson["url"].(string)
+		if strings.Contains(mdpURL, aid) {
+			apiURL := apiPrefix + mdpURL
+			return apiURL, nil
 		}
 	}
-	return
+	return "", errors.New("url not found")
+}
+
+func (m *MdprWrapper) GetImgs(url string) ([]string, error) {
+	resBody, err := m.fetch(url, m.apiHeader())
+	if err != nil {
+		return nil, err
+	}
+	var apiJSON map[string]interface{}
+	err = json.Unmarshal(resBody, &apiJSON)
+	if err != nil {
+		return nil, err
+	}
+	imgList := apiJSON["list"].([]interface{})
+	var imgs []string
+	for i := 0; i < len(imgList); i++ {
+		mData := imgList[i].(map[string]interface{})
+		imgs = append(imgs, mData["url"].(string))
+	}
+	return imgs, nil
+}
+
+func Get(url string) ([]string, error) {
+	m := new(MdprWrapper)
+	url, ok := m.URLCheck(url)
+	if ok {
+		imgURL, err := m.GetImgURL(url)
+		if err != nil {
+			return nil, err
+		}
+		imgs, err := m.GetImgs(imgURL)
+		if err != nil {
+			return nil, err
+		}
+		return imgs, nil
+	}
+	return nil, errors.New("url is error")
 }
